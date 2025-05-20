@@ -30,13 +30,6 @@ const keyboardKeys: string[][] = [];
 const keyboardRows = ref<string[][]>([]);
 
 // Initialisation
-for (let x = 0; x < numRows; x++) {
-  rows.value[x] = [];
-  for (let y = 0; y < numCols; y++) {
-    rows.value[x]![y] = { letter: '', state: CellState.Unknown };
-  }
-}
-
 keyboardKeys.push(['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p']);
 keyboardKeys.push(['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l']);
 keyboardKeys.push(['z', 'x', 'c', 'v', 'b', 'n', 'm']);
@@ -44,13 +37,38 @@ keyboardKeys.push(['z', 'x', 'c', 'v', 'b', 'n', 'm']);
 for (let x = 0; x < keyboardKeys.length; x++) {
   keyboardRows.value[x] = [];
   for (let y = 0; y < keyboardKeys[x]!.length; y++) {
-    const key = keyboardKeys[x]![y] as string;
-    letters.value[key] = CellState.Unknown;
-    keyboardRows.value[x]![y] = key;
+    keyboardRows.value[x]![y] = keyboardKeys[x]![y]!;
   }
 }
 
-word.value = words[Math.floor(Math.random() * words.length)]!;
+const resetBoard = (): void => {
+  for (let x = 0; x < numRows; x++) {
+    rows.value[x] = [];
+    for (let y = 0; y < numCols; y++) {
+      rows.value[x]![y] = { letter: '', state: CellState.Unknown };
+    }
+  }
+}
+
+const reset = (): void => {
+
+  currentRow.value = 0;
+  currentCol.value = 0;
+  status.value = '';
+  complete.value = false;
+  resetBoard();
+
+  // Reset keyboard key states
+  for (let x = 0; x < keyboardKeys.length; x++) {
+    for (let y = 0; y < keyboardKeys[x]!.length; y++) {
+      letters.value[keyboardKeys[x]![y]!] = CellState.Unknown;
+    }
+  }
+
+  // Load a new word
+  word.value = words[Math.floor(Math.random() * words.length)]!;
+}
+reset();
 
 // Methods
 const isAlphabet = (char: string): boolean => /^[a-zA-Z]$/.test(char);
@@ -154,7 +172,7 @@ const handleKeyStroke = async (key: string): Promise<boolean> => {
   }
 
   if (key == 'F5') {
-    return false;
+    reset();
   }
   else if (key == 'F12') {
     return false;
