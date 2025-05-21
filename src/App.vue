@@ -1,3 +1,30 @@
+<template>
+  <header>
+    WORDLE
+  </header>
+
+  <main>
+    <div class="status">
+      {{ status }} &nbsp;
+    </div>
+
+    <div v-for="(row, rowIndex) in rows" :key="rowIndex">
+      <div v-for="(_, colIndex) in row" class="cell" :key="colIndex">
+        <input type="text" maxlength="1" v-model="rows[rowIndex]![colIndex]!.letter"
+          :class="getCellClass(rowIndex, colIndex)">
+      </div>
+    </div>
+
+    <div class="keyboard">
+      <div class="keyboardRow" v-for="(keyboardRow, keyboardRowIndex) in keyboardRows" :key="keyboardRowIndex">
+        <div :class="getKeyboardKeyClass(letters[keyboardKey]!)" v-for="keyboardKey in keyboardRow" :key="keyboardKey">
+          {{ keyboardKey }}
+        </div>
+      </div>
+    </div>
+  </main>
+</template>
+
 <script setup lang="ts">
 import { ref } from 'vue';
 import { onKeyStroke } from '@vueuse/core'
@@ -15,7 +42,7 @@ enum CellState {
   ExactMatch
 }
 
-interface LetterDictionary {
+interface LetterStateDictionary {
   [key: string]: CellState;
 }
 
@@ -25,7 +52,7 @@ const word = ref('');
 const status = ref('');
 const complete = ref(false);
 const rows = ref<({ letter: string, state: CellState })[][]>([]);
-const letters = ref<LetterDictionary>({});
+const letters = ref<LetterStateDictionary>({});
 const keyboardKeys: string[][] = [];
 const keyboardRows = ref<string[][]>([]);
 
@@ -73,7 +100,7 @@ reset();
 // Methods
 const isAlphabet = (char: string): boolean => /^[a-zA-Z]$/.test(char);
 
-const getRowWord = () => {
+const getCurrentRowWord = () => {
   let rowWord = '';
   for (let y = 0; y < numCols; y++) {
     rowWord += rows.value[currentRow.value]![y]!.letter;
@@ -81,42 +108,51 @@ const getRowWord = () => {
   return rowWord;
 }
 
-const updateCell = (colIndex: number) => {
-  const rowWord = getRowWord();
+const updateRow = () => {
+  const letterCounts: { [key: string]: number } = {};
 
-  const letter = rowWord[colIndex]!;
-  const wordIndexes = getIndexes(word.value, letter);
-  const rowWordIndexes = getIndexes(rowWord, letter);
+  for (let colIndex = 0; colIndex < numCols; colIndex++) {
+    const wordLetter = word.value[colIndex]!;
+    const cellLetter = rows.value[currentRow.value]![colIndex]!.letter;
 
-  if (wordIndexes.includes(colIndex)) {
-    rows.value[currentRow.value]![colIndex]!.state = CellState.ExactMatch;
-    updateKeyboardKeyState(letter, CellState.ExactMatch);
-  }
-  else if (wordIndexes.length > 0) {
-    // Magic: I bet you'll never be able to work out what this does ever again!
-    const matchIndex = rowWordIndexes.indexOf(colIndex);
-
-    if (matchIndex < wordIndexes.length) {
-      rows.value[currentRow.value]![colIndex]!.state = CellState.Match;
-      updateKeyboardKeyState(letter, CellState.Match);
+    // Exact match?
+    if (cellLetter === wordLetter) {
+      console.log(`Exact match on ${cellLetter} at column ${colIndex}`);
+      updateCellState(colIndex, CellState.ExactMatch);
+      updateKeyboardKeyState(cellLetter, CellState.ExactMatch);
+    }
+    else { // No? Then add it to a list of uncounted letters.
+      if (!letterCounts[wordLetter]) {
+        letterCounts[wordLetter] = 1;
+      } else {
+        letterCounts[wordLetter]++;
+      }
+      console.log(`Added letterCount[${wordLetter}] now ${letterCounts[wordLetter]}`);
     }
   }
-  else {
-    updateKeyboardKeyState(letter, CellState.Unused);
+
+  for (let colIndex = 0; colIndex < numCols; colIndex++) {
+    const cellLetter = rows.value[currentRow.value]![colIndex]!.letter;
+
+    console.log(`Value for letterCount[${cellLetter}] = ${letterCounts[cellLetter]}`);
+    if (letterCounts[cellLetter] && letterCounts[cellLetter] > 0) {
+      letterCounts[cellLetter]--;
+      updateCellState(colIndex, CellState.Match);
+      updateKeyboardKeyState(cellLetter, CellState.Match);
+    }
+    else {
+      updateKeyboardKeyState(cellLetter, CellState.Unused);
+    }
   }
 }
 
 const processGuess = async (): Promise<void> => {
-  const rowWord = getRowWord();
-
-  console.log(`Processing guess ${rowWord}`);
+  const rowWord = getCurrentRowWord();
 
   // Is it a valid word in our dictionary?
   if (words.includes(rowWord)) {
 
-    for (let i = 0; i < numCols; i++) {
-      updateCell(i);
-    }
+    updateRow();
 
     // Does it match our word?
     if (rowWord === word.value) {
@@ -187,21 +223,18 @@ onKeyStroke((e: KeyboardEvent): void => {
     .catch(() => { });
 });
 
+const updateCellState = (colIndex: number, state: CellState) => {
+  const currentState = rows.value[currentRow.value]![colIndex]?.state;
+  if (currentState !== CellState.ExactMatch && currentState !== CellState.Unused) {
+    rows.value[currentRow.value]![colIndex]!.state = state;
+  }
+}
+
 const updateKeyboardKeyState = (key: string, state: CellState) => {
   const currentState = letters.value[key];
   if (currentState !== CellState.ExactMatch && currentState !== CellState.Unused) {
     letters.value[key] = state;
   }
-}
-
-const getIndexes = (str: string, char: string): number[] => {
-  const indexes = [];
-  for (let i = 0; i < str.length; i++) {
-    if (str[i] === char) {
-      indexes.push(i);
-    }
-  }
-  return indexes;
 }
 
 const getClass = (state: CellState): string => {
@@ -230,34 +263,28 @@ const getKeyboardKeyClass = (state: CellState) => {
   const cellClass = getClass(state);
   return cellClass ? 'keyboardKey ' + cellClass : 'keyboardKey';
 }
+
+/*
+const test = async (): Promise<void> => {
+  const testWordGuess = async (testWord: string, guessWord: string): Promise<void> => {
+    word.value = testWord;
+    for (let i = 0; i < guessWord.length; i++) {
+      await handleKeyStroke(guessWord[i]!);
+    }
+    await handleKeyStroke("Enter");
+  }
+
+  await testWordGuess("rawer", "waver");
+  //await testWordGuess("moron", "droll");
+  //await testWordGuess("droll", "moron");
+  //await testWordGuess("moron", "drool");
+  //await testWordGuess("flags", "slags");
+  //await testWordGuess("jowly", "clamp");
+}
+
+test().then(() => { }).catch(() => { });
+*/
 </script>
-
-<template>
-  <header>
-    WORDLE
-  </header>
-
-  <main>
-    <div class="status">
-      {{ status }} &nbsp;
-    </div>
-
-    <div v-for="(row, rowIndex) in rows" :key="rowIndex">
-      <div v-for="(_, colIndex) in row" class="cell" :key="colIndex">
-        <input type="text" maxlength="1" v-model="rows[rowIndex]![colIndex]!.letter"
-          :class="getCellClass(rowIndex, colIndex)">
-      </div>
-    </div>
-
-    <div class="keyboard">
-      <div class="keyboardRow" v-for="(keyboardRow, keyboardRowIndex) in keyboardRows" :key="keyboardRowIndex">
-        <div :class="getKeyboardKeyClass(letters[keyboardKey]!)" v-for="keyboardKey in keyboardRow" :key="keyboardKey">
-          {{ keyboardKey }}
-        </div>
-      </div>
-    </div>
-  </main>
-</template>
 
 <style scoped>
 header {
