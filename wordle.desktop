@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Wordle
+Comment=Wordle
+Exec=wordle
+Icon=org.gnome.Terminal
+Terminal=false
+Type=Application
+StartupNotify=true
+Categories=GNOME;
