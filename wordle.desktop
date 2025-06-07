@@ -2,7 +2,7 @@
 Name=Wordle
 Comment=Wordle
 Exec=wordle
-Icon=org.gnome.Terminal
+Icon=wordle.png
 Terminal=false
 Type=Application
 StartupNotify=true

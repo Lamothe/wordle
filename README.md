@@ -38,11 +38,12 @@ quasar build
 quasar build -m electron
 ```
 
-### Install the electron app (Note: if .local/bin does not already exist then you need to restart your bash session)
+### Install the electron app
 
 ```bash
 mkdir -p ~/.local/bin
-ln -s dist/electron/Packaged/wordle-linux-x64/wordle ~/.local/bin
+ln -s $PWD/dist/electron/Packaged/wordle-linux-x64/wordle ~/.local/bin
+ln -s $PWD/dist/electron/UnPackaged/favicon.png ~/.local/share/icons/wordle.png
 ```
 
 ### Customize the configuration
